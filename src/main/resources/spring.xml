@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context" xmlns:tx="http://www.springframework.org/schema/tx"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd">
+
+    <!--
+	 0.加载service包下的component相关的注解：@Service @Autowired
+	 1.加载db.properties
+	 2.创建数据源
+	 3.创建sqlSessionFactory对象
+	 4.创建dao对象
+
+	 5.创建事务管理器
+	 6.创建事务增强：指定事务规则
+	 7.定义切入点
+	 8.做编织处理 -->
+    <!--  0.让spring读取注解 -->
+    <context:component-scan base-package="com.bb.service"></context:component-scan>
+
+    <!-- 1.加载db.properties -->
+    <context:property-placeholder location="classpath:db.properties"></context:property-placeholder>
+
+    <!-- 2.创建数据源 bean -->
+    <bean class="com.alibaba.druid.pool.DruidDataSource" id="dataSource">
+        <property name="driverClassName" value="${jdbc.driver}"></property>
+        <property name="url" value="${jdbc.url}"></property>
+        <property name="username" value="${jdbc.username}"></property>
+        <property name="password" value="${jdbc.password}"></property>
+    </bean>
+
+    <!-- 3.创建sqlSession工厂对象 -->
+    <!-- a.依赖数据源 -->
+    <!-- b.加载映射文件 -->
+    <bean class="org.mybatis.spring.SqlSessionFactoryBean" id="sqlSessionFactory">
+        <property name="dataSource" ref="dataSource"></property>
+        <property name="typeAliasesPackage" value="com.bb.entity"></property>
+        <property name="mapperLocations" value="classpath:com/bb/dao/*Mapper.xml"></property>
+        <!--分页-->
+        <property name="plugins">
+            <array>
+                <bean class="com.github.pagehelper.PageInterceptor">
+                    <property name="properties" value=""></property>
+                </bean>
+            </array>
+        </property>
+    </bean>
+
+    <!-- 4.创建dao代理对象：需要把dao接口交给spring -->
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <property name="basePackage" value="com.bb.dao"></property>
+        <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"></property>
+    </bean>
+
+
+    <!-- 5.事务处理 -->
+    <!-- a.事务管理器 -->
+    <!-- b.指定事务规则 -->
+    <!-- c.切入点 -->
+
+    <bean class="org.springframework.jdbc.datasource.DataSourceTransactionManager" id="txManager">
+        <property name="dataSource" ref="dataSource"></property>
+    </bean>
+
+    <tx:advice id="txAdvice" transaction-manager="txManager">
+        <tx:attributes>
+            <tx:method name="set*" read-only="true"/>
+            <tx:method name="get*" read-only="true"/>
+            <tx:method name="*" propagation="REQUIRED"/>
+        </tx:attributes>
+    </tx:advice>
+
+    <aop:config>
+        <aop:pointcut expression="execution(* com.bb.service.*.*(..))" id="servicePointcut"/>
+        <aop:advisor advice-ref="txAdvice" pointcut-ref="servicePointcut"/>
+    </aop:config>
+</beans>
